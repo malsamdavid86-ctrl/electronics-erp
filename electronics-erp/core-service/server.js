@@ -9,11 +9,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Initialize the Stripe engine
+// Initialize the Stripe engine with your environment secret key
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
 
 // ====================================================================
-# DATA LAYER CONNECTION ARCHITECTURE
+// DATA LAYER CONNECTION ARCHITECTURE
 // ====================================================================
 
 // PostgreSQL Connection Pooling Configuration
@@ -34,7 +34,7 @@ redisClient.on('error', (err) => console.error('⚡ REDIS_CACHE_DISCONNECTED:', 
 redisClient.connect().then(() => console.log('✔ REDIS_PIPELINE_ESTABLISHED'));
 
 // ====================================================================
-# MIDDLEWARE CONTEXT
+// MIDDLEWARE CONTEXT
 // ====================================================================
 
 // Standard JSON parser. Stripe requires raw payload parsing for webhooks,
@@ -58,7 +58,7 @@ app.get('/health', async (req, res) => {
 });
 
 // ====================================================================
-# HIGH-SPEED PC BUILD COMPATIBILITY & CACHE ENGINE
+// HIGH-SPEED PC BUILD COMPATIBILITY & CACHE ENGINE
 // ====================================================================
 
 app.post('/verify-build-compatibility', async (req, res) => {
@@ -133,10 +133,11 @@ app.post('/verify-build-compatibility', async (req, res) => {
 });
 
 // ====================================================================
-# STRIPE PAYMENT & LOAN FINANCING MODULES
+// STRIPE PAYMENT, PRICE OBJECT & SUBSCRIPTION LOAN MODULE
 // ====================================================================
+
 /**
- * POST /api/core/finance/initialize-loan-financing
+ * POST /finance/initialize-loan-financing
  * Spawns an upfront down-payment intent and constructs a structural 
  * multi-month installment loan profile using Stripe's native Billing Engine.
  */
@@ -164,7 +165,7 @@ app.post('/finance/initialize-loan-financing', async (req, res) => {
       currency: 'usd',
       customer: customer.id,
       description: 'Custom PC Hardware - Required Down Payment Deposit',
-      metadata: { transaction_type: 'DOWN_PAYMENT', total_financed_loan: totalBuildCost - downPaymentAmount }
+      metadata: { transaction_type: 'DOWN_PAYMENT', total_financed_loan: String(totalBuildCost - downPaymentAmount) }
     });
 
     // 4. Generate a Transient Product Descriptor Sheet for the installment plan
@@ -182,7 +183,7 @@ app.post('/finance/initialize-loan-financing', async (req, res) => {
         interval: 'month',
         interval_count: 1
       },
-      metadata: { total_installments_scheduled: installmentsCount }
+      metadata: { total_installments_scheduled: String(installmentsCount) }
     });
 
     // 6. Bind the Price Engine directly into an Active Corporate Subscription Profile
@@ -192,11 +193,10 @@ app.post('/finance/initialize-loan-financing', async (req, res) => {
       payment_behavior: 'default_incomplete', // Keeps profile safe until first payment clears
       payment_settings: { save_default_payment_method: 'on_subscription' },
       expand: ['latest_invoice.payment_intent'],
-      // Advanced Strategy: Cap the life cycle of the subscription to stop once the terms complete
       cancel_at_period_end: false, 
       metadata: {
-        installments_target: installmentsCount,
-        current_term_index: 1
+        installments_target: String(installmentsCount),
+        current_term_index: '1'
       }
     });
 
@@ -213,36 +213,17 @@ app.post('/finance/initialize-loan-financing', async (req, res) => {
     res.status(500).json({ error: "PAYMENT_GATEWAY_ERROR", msg: error.message });
   }
 });
-app.post('/finance/create-payment-intent', async (req, res) => {
-  const { userId, totalBuildCost, downPaymentAmount } = req.body;
 
-  try {
-    const downPaymentCents = Math.round(downPaymentAmount * 100);
-
-    // Provisions an customer shell identifier inside Stripe's grid
-    const customer = await stripe.customers.create({
-      metadata: { internal_user_id: userId || 'anonymous_tech_build' }
-    });
-
-    // Draft immediate deposit parameter fields
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: downPaymentCents,
-      currency: 'usd',
-      customer: customer.id,
-      description: 'Custom Hardware Platform Down Payment Deposit',
-      metadata: { transaction_type: 'DOWN_PAYMENT', build_total: totalBuildCost }
-    });
-
-    res.json({
-      clientSecret: paymentIntent.client_secret,
-      customerId: customer.id
-    });
-
-  } catch (error) {
-    console.error('⚡ STRIPE_INTENT_FAULT:', error);
-    res.status(500).json({ error: "PAYMENT_GATEWAY_ERROR", msg: error.message });
-  }
-});
+// Helper validation routine wrapper simulating database log lookups
+async function countPaidInvoices(customerId, subscriptionId) {
+  const invoices = await stripe.invoices.list({
+    customer: customerId,
+    subscription: subscriptionId,
+    status: 'paid',
+    limit: 50
+  });
+  return invoices.data.length;
+}
 
 app.post('/finance/stripe-webhook-handler', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
@@ -264,36 +245,31 @@ app.post('/finance/stripe-webhook-handler', express.raw({ type: 'application/jso
       break;
 
     case 'invoice.payment_succeeded':
-      case 'invoice.payment_succeeded':
-  const invoice = event.data.object;
-  
-  // If the invoice is tied to an active loan subscription track...
-  if (invoice.subscription) {
-    try {
-      const subProfile = await stripe.subscriptions.retrieve(invoice.subscription);
-      const totalTargetTerms = parseInt(subProfile.metadata.installments_target);
-      
-      // Pull previous billing data or count past paid invoices from your DB to calculate current term index
-      // For this implementation context, we check if we've hit the final installment payment threshold
-      const currentTermIndex = await countPaidInvoices(invoice.customer, invoice.subscription);
-
-      console.log(`📡 Subscription Loop Check: Term [${currentTermIndex}/${totalTargetTerms}] Processed.`);
-
-      if (currentTermIndex >= totalTargetTerms) {
-        console.log(`🏁 LOAN_FULLY_PAID: Term target achieved. Cancelling subscription ${invoice.subscription} natively.`);
-        
-        // Gracefully cancel the subscription tracking timeline at the end of the current billing cycle
-        await stripe.subscriptions.update(invoice.subscription, {
-          cancel_at_period_end: true 
-        });
-      }
-    } catch (subErr) {
-      console.error('⚠️ SUBSCRIPTION_INTERCEPTION_ERROR:', subErr.message);
-    }
-  }
-  break;
       const invoice = event.data.object;
-      console.log(`💚 INSTALLMENT_PROCESSED: Loan layer payment recorded for subscription profile: ${invoice.subscription}`);
+      
+      // If the invoice is tied to an active loan subscription track...
+      if (invoice.subscription) {
+        try {
+          const subProfile = await stripe.subscriptions.retrieve(invoice.subscription);
+          const totalTargetTerms = parseInt(subProfile.metadata.installments_target);
+          
+          // Calculate historical invoice terms resolved from Stripe's log ledger
+          const currentTermIndex = await countPaidInvoices(invoice.customer, invoice.subscription);
+
+          console.log(`📡 Subscription Loop Check: Term [${currentTermIndex}/${totalTargetTerms}] Processed.`);
+
+          if (currentTermIndex >= totalTargetTerms) {
+            console.log(`🏁 LOAN_FULLY_PAID: Term target achieved. Cancelling subscription ${invoice.subscription} natively.`);
+            
+            // Gracefully cancel the subscription tracking timeline at the end of the current billing cycle
+            await stripe.subscriptions.update(invoice.subscription, {
+              cancel_at_period_end: true 
+            });
+          }
+        } catch (subErr) {
+          console.error('⚠️ SUBSCRIPTION_INTERCEPTION_ERROR:', subErr.message);
+        }
+      }
       break;
 
     default:
@@ -306,132 +282,4 @@ app.post('/finance/stripe-webhook-handler', express.raw({ type: 'application/jso
 // Start listening for inbound application cluster queries
 app.listen(PORT, () => {
   console.log(`📡 CORE_SERVICE NODE RUNNING ON PORT // ${PORT}`);
-});
-// Append this configuration to your core-service/server.js file
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
-
-/**
- * POST /api/core/finance/create-payment-intent
- * Generates initial down-payment tokens and creates customer subscription ledger hooks
- */
-app.post('/finance/create-payment-intent', async (req, res) => {
-  const { userId, totalBuildCost, downPaymentAmount, monthlyInstallmentWeeks } = req.body;
-
-  try {
-    // 1. Calculate the matching monetary value in lowest denominations (cents/pence)
-    const downPaymentCents = Math.round(downPaymentAmount * 100);
-
-    // 2. Provision an immutable customer reference shell inside Stripe's infrastructure
-    const customer = await stripe.customers.create({
-      metadata: { internal_user_id: userId }
-    });
-
-    // 3. Draft the immediate upfront down payment parameters 
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: downPaymentCents,
-      currency: 'usd',
-      customer: customer.id,
-      description: 'Custom Hardware Infrastructure Matrix Down Payment',
-      metadata: { transaction_type: 'DOWN_PAYMENT' }
-    });
-
-    // 4. (Optional) Here you would also create a 'Price' object and 'Subscription' 
-    // if using Stripe's native recurring billing system for the installment phase.
-
-    res.json({
-      clientSecret: paymentIntent.client_secret,
-      customerId: customer.id
-    });
-
-  } catch (error) {
-    console.error('⚡ STRIPE_INTENT_FAULT:', error);
-    res.status(500).json({ error: "PAYMENT_GATEWAY_ERROR", msg: error.message });
-  }
-});
-
-/**
- * POST /api/core/finance/stripe-webhook-handler
- * Strictly processes background payment success signals from Stripe.
- * NOTE: Needs raw body parsing enabled specifically for this route route block.
- */
-app.post('/finance/stripe-webhook-handler', express.raw({ type: 'application/json' }), async (req, res) => {
-  const sig = req.headers['stripe-signature'];
-  let event;
-
-  try {
-    // Validate that the request originates from Stripe's authentic validation servers
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET || 'whsec_mock');
-  } catch (err) {
-    console.error(`❌ WEBHOOK_SIGNATURE_INVALID: ${err.message}`);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  // Orchestrate systems updates based on processing events
-  switch (event.type) {
-    case 'payment_intent.succeeded':
-      const paymentIntent = event.data.object;
-      console.log(`✔ TRANSACTION_CLEARED: Intent ${paymentIntent.id} passed validation metrics.`);
-      
-      // Update your PostgreSQL database to mark the down payment paid
-      // await pgPool.query('UPDATE builds SET status = $1 WHERE stripe_id = $2', ['FINANCED_ACTIVE', paymentIntent.id]);
-      break;
-
-    case 'invoice.payment_succeeded':
-      // Captures recurring monthly automated loan installments 
-      const invoice = event.data.object;
-      console.log(`💚 INSTALLMENT_PROCESSED: Monthly payment logged for Subscription: ${invoice.subscription}`);
-      break;
-
-    default:
-      console.log(`ℹ️ UNHANDLED_STRIPE_STREAM: ${event.type}`);
-  }
-
-  res.json({ received: true });
-
-  /**
- * GET /api/admin/hr/time-logs
- * Collects and streams real-time active station metrics to the TimeManagement view.
- */
-app.get('/admin/hr/time-logs', async (req, res) => {
-  try {
-    // Select the most recent punch records for employees active on the floor today
-    const queryResult = await pool.query(`
-      SELECT DISTINCT ON (user_id) 
-        id, 
-        user_id, 
-        station_identifier AS station, 
-        event_type AS status, 
-        recorded_at
-      FROM employee_time_logs
-      ORDER BY user_id, recorded_at DESC
-    `);
-
-    // Format rows into the clean JSON model expected by your React layout hook
-    const activeShifts = queryResult.rows.map(row => {
-      const elapsedMs = new Date() - new Date(row.recorded_at);
-      const hours = String(Math.floor(elapsedMs / (1000 * 60 * 60))).padStart(2, '0');
-      const minutes = String(Math.floor((elapsedMs % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, '0');
-      const seconds = String(Math.floor((elapsedMs % (1000 * 60)) / 1000)).padStart(2, '0');
-
-      return {
-        id: row.id,
-        engineer: `User ID: ${row.user_id.substring(0, 5)}...`, // Resolves to a readable stub
-        station: row.station,
-        duration: `${hours}:${minutes}:${seconds}`,
-        status: row.status === 'CLOCK_IN' ? 'ACTIVE' : 'CRITICAL_LIMIT',
-        overtimeRisk: parseInt(hours) >= 8 // Flags risk status when passing standard shifts
-      };
-    });
-
-    res.json(activeShifts);
-
-  } catch (err) {
-    // Fall back to runtime structural array layouts if database components are syncing/offline
-    res.status(200).json([
-      { id: "SFT-901", engineer: "Linus C.", station: "Micro-Solder Bench A", duration: "06:42:15", status: "ACTIVE", overtimeRisk: false },
-      { id: "SFT-902", engineer: "Sarah T.", station: "Precision Diagnostics", duration: "07:55:40", status: "CRITICAL_LIMIT", overtimeRisk: true },
-      { id: "SFT-903", engineer: "Alexei K.", station: "Triage Bay 3", duration: "03:15:22", status: "ACTIVE", overtimeRisk: false }
-    ]);
-  }
-});
 });
