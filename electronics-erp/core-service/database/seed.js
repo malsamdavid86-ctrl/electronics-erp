@@ -11,10 +11,10 @@ const pool = new Pool({
 });
 
 async function seedProducts() {
-  const categories = ['CPU', 'GPU', 'RAM', 'SSD', 'Keyboard'];
-  const brands = ['AeroVolt', 'QuantumTech', 'HyperSolder', 'ApexCircuit', 'NeonMatrix'];
+  const categories = ['CPU','Smartphones','BLUETOOTH SPEAKERS','PORTABLE CHARGERS', 'SMARTWATCHES','SMART HOME DEVICES','SECURITY CAMMERAS','GAMECONSOLES','TABLETS','PROJECTORS','TV','HOME THEATER','NETWORKING','MOTHERBOARDS', 'GPU', 'RAM', 'SSD', 'Keyboard'];
+  const brands = ['AeroVolt', 'QuantumTech', 'QuantumTech', 'QuantumTech', 'Google', 'Samsung', 'Apple', 'Asus', 'Intel', 'AMD', 'Amazon', 'Alexa', 'Wise', 'corsair', 'JLab', 'DELL', 'HP', 'LG', 'NIKON', 'SONY', 'BEATS', 'GOPRO', 'QuantumTech', 'HyperSolder', 'ApexCircuit', 'NeonMatrix'];
   
-  console.log("⚡ Initializing procedural seeding for 250 hardware nodes...");
+  console.log("⚡ Initializing procedural seeding for 450 hardware nodes...");
 
   try {
     // Ensure table exists with correct schema matching our previous setups
@@ -33,7 +33,7 @@ async function seedProducts() {
     // Truncate existing components to prevent constraint pollution
     await pool.query('TRUNCATE TABLE components;');
 
-    for (let i = 1; i <= 250; i++) {
+    for (let i = 1; i <= 450; i++) {
       const category = categories[i % categories.length];
       const brand = brands[i % brands.length];
       const id = crypto.randomUUID();
