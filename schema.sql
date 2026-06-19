@@ -12,6 +12,21 @@ CREATE TABLE work_shifts (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- PostgreSQL Table Schema for Time Tracking Metrics
+CREATE TYPE punch_type AS ENUM ('CLOCK_IN', 'BREAK_START', 'BREAK_END', 'CLOCK_OUT');
+
+CREATE TABLE employee_time_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    station_identifier VARCHAR(100) NOT NULL,
+    event_type punch_type NOT NULL,
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    is_overtime_risk BOOLEAN DEFAULT FALSE
+);
+
+-- Optimize queries for tracking today's active workforce panels
+CREATE INDEX idx_active_punches_today ON employee_time_logs (recorded_at DESC);
+
 -- Indexing temporal fields to guarantee lightning-fast weekly roster lookups
 CREATE INDEX idx_shifts_timeline ON work_shifts (shift_start, shift_end);
 CREATE INDEX idx_shifts_user ON work_shifts (user_id);
