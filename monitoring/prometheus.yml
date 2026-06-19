@@ -1,0 +1,22 @@
+global:
+  scrape_interval: 15s     # How frequently to poll the container infrastructure
+  evaluation_interval: 15s # How frequently to evaluate alerting rules
+
+scrape_configs:
+  # 1. Core JS Service Metrics
+  - job_name: 'express-core-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['core-service:5000']
+
+  # 2. Finance & HR Service Metrics
+  - job_name: 'fastapi-finance-hr'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['finance-hr-service:8000']
+
+  # 3. Nginx Gateway Traffic Analytics
+  - job_name: 'nginx-api-gateway'
+    metrics_path: '/stub_status'
+    static_configs:
+      - targets: ['api-gateway:80']
