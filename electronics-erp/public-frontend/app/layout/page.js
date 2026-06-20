@@ -1,47 +1,57 @@
-import React from 'react';
-import '@/app/globals.css'; // Global Tailwind configuration injection
+'use client';
 
-export const metadata = {
-  title: 'REPAIR_HUB // Enterprise Management Console',
-  description: 'Automated logistics, diagnostic scheduling, and customer core tracking systems.',
-};
+import React, { useState } from 'react';
 
-export default function RootLayout({ children }) {
+export default function LayoutDiagnosticPage() {
+  const [gridDensity, setGridDensity] = useState('STANDARD');
+
   return (
-    <html lang="en" className="bg-[#0B0F19]">
-      <body className="min-h-screen text-gray-100 antialiased selection:bg-[#00F0FF] selection:text-black">
-        {/* Global Matrix Frame Layer Header */}
-        <header className="border-b border-[#24324D] bg-[#111723]/80 backdrop-blur-md sticky top-0 z-50 font-mono text-xs px-8 py-4">
-          <div className="max-w-7xl mx-auto flex justify-between items-center">
-            <div className="flex items-center gap-6">
-              <a href="/" className="font-black tracking-widest text-white hover:text-[#00F0FF] transition-colors">
-                ⚡ REPAIR_HUB // <span className="text-[#00F0FF]">CORE_OS</span>
-              </a>
-              <nav className="hidden md:flex items-center gap-4 text-gray-400">
-                <a href="/catalog" className="hover:text-white transition-colors">// CATALOG</a>
-                <a href="/loyalty" className="hover:text-white transition-colors">// REWARDS</a>
-              </nav>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="h-2 w-2 rounded-full bg-[#00FF66] animate-pulse" />
-              <span className="text-gray-500 text-[10px] uppercase tracking-wider hidden sm:inline">
-                GATEWAY_NODE_ACTIVE
-              </span>
+    <div className="min-h-screen bg-[#0B0F19] text-gray-100 font-mono p-8">
+      {/* Top Telemetry Header Panel */}
+      <div className="max-w-4xl mx-auto border-b border-[#24324D] pb-4 mb-8">
+        <h1 className="text-xl font-black uppercase text-white">SYS // <span className="text-[#00F0FF]">LAYOUT_DIAGNOSTICS</span></h1>
+        <p className="text-xs text-gray-400 mt-1">Reviewing viewport density metrics and theme compliance variables.</p>
+      </div>
+
+      {/* Control Interactive Matrix */}
+      <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-[#111723] border border-[#24324D] rounded-xl p-5 space-y-4">
+          <h3 className="text-xs font-black text-white uppercase">// VIEWPORT_CONTROLS</h3>
+          <div className="space-y-2">
+            {['COMPACT', 'STANDARD', 'REDUNDANT'].map((tier) => (
+              <button
+                key={tier}
+                onClick={() => setGridDensity(tier)}
+                className={`w-full text-left text-xs font-bold px-3 py-2 border rounded uppercase transition-all ${
+                  gridDensity === tier 
+                    ? 'bg-[#161F30] text-[#00F0FF] border-[#00F0FF]' 
+                    : 'bg-[#0B0F19] text-gray-500 border-[#24324D] hover:text-gray-300'
+                }`}
+              >
+                {tier} Mode
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Layout Output Monitor Sandbox */}
+        <div className="md:col-span-2 bg-[#111723] border border-[#24324D] rounded-xl p-5 flex flex-col justify-between min-h-[220px]">
+          <div>
+            <span className="text-[9px] text-gray-500 block uppercase font-bold mb-2">LIVE_RENDER_CONTAINER</span>
+            <div className={`grid gap-3 transition-all ${
+              gridDensity === 'COMPACT' ? 'grid-cols-4 text-[10px]' : gridDensity === 'STANDARD' ? 'grid-cols-2 text-xs' : 'grid-cols-1 text-sm'
+            }`}>
+              <div className="p-3 bg-[#161F30] border border-[#24324D] rounded text-center font-bold">NODE_01</div>
+              <div className="p-3 bg-[#161F30] border border-[#24324D] rounded text-center font-bold">NODE_02</div>
+              <div className="p-3 bg-[#161F30] border border-[#24324D] rounded text-center font-bold">NODE_03</div>
+              <div className="p-3 bg-[#161F30] border border-[#24324D] rounded text-center font-bold">NODE_04</div>
             </div>
           </div>
-        </header>
-
-        {/* Dynamic Nested Page Routing Target */}
-        <main>{children}</main>
-
-        {/* Global Persistent Infrastructure Footer */}
-        <footer className="border-t border-[#24324D]/40 bg-[#0B0F19] text-[10px] text-gray-600 font-mono py-6 px-8 mt-12">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
-            <span>© 2026 REPAIR_HUB ENTERPRISE LOGISTICS SYSTEMS INC. ALL RIGHTS RESERVED.</span>
-            <span className="tracking-widest text-gray-700">STRICT_ENCRYPTION_MODE_ON</span>
+          <div className="border-t border-[#24324D]/60 pt-3 text-[10px] text-gray-500 text-right">
+            Active Layout Density Spec Matrix: <span className="text-[#00F0FF] font-bold">{gridDensity}</span>
           </div>
-        </footer>
-      </body>
-    </html>
+        </div>
+      </div>
+    </div>
   );
 }
